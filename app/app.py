@@ -8,15 +8,11 @@ from db import get_db, setup_database
 
 
 app = Flask(__name__)
-_db_ready = False
 
 
-@app.before_request
+@app.before_first_request
 def initialize():
-    global _db_ready
-    if not _db_ready:
-        setup_database()
-        _db_ready = True
+    setup_database()
 
 
 def _fetch_one(query, params=()):
