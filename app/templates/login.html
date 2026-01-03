@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="card">
+    <h2>Sign in to the demo</h2>
+    <p class="muted">Select a role and user to preview the dashboards.</p>
+    <form action="{{ url_for('login') }}" method="post">
+      <label for="role">Role</label>
+      <select name="role" id="role">
+        <option value="student">Student</option>
+        <option value="lecturer">Lecturer</option>
+      </select>
+
+      <label for="user_id">User</label>
+      <select name="user_id" id="user_id">
+        <optgroup label="Students">
+          {% for student in students %}
+          <option value="{{ student.id }}">{{ student.name }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Lecturers">
+          {% for lecturer in lecturers %}
+          <option value="{{ lecturer.id }}">{{ lecturer.name }}</option>
+          {% endfor %}
+        </optgroup>
+      </select>
+      <div style="margin-top: 1rem;">
+        <button class="button" type="submit">Continue</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Reader demo</h3>
+    <p class="muted">
+      Run <code>python app/nfc_reader.py</code> and use card UIDs like
+      <strong>04A1B2C3D4</strong> or mobile tokens like <strong>mtu-token-aoife</strong>.
+    </p>
+  </div>
+{% endblock %}
