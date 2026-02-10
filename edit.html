@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Edit Students</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .panel {
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #111827;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span id="moduleHeader">Edit Students</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="panel">
+      <h3>Update NFC UID</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input id="studentId" placeholder="Student ID" style="flex:1; min-width:160px;" />
+        <input id="nfcUid" placeholder="NFC UID (e.g. 04A1B2C3)" style="flex:2; min-width:200px;" />
+        <button onclick="updateNfc()">Update</button>
+      </div>
+      <div id="updateStatus" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Students</h3>
+      <button onclick="loadStudents()">Refresh List</button>
+      <div id="studentsWrap"></div>
+    </div>
+  </div>
+
+  <script>
+    const moduleId = localStorage.getItem("module");
+
+    function setStatus(msg) {
+      document.getElementById("updateStatus").textContent = msg;
+    }
+
+    function ensureLogin() {
+      return fetch("/api/auth/me", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.user) {
+            window.location = "lecturer-login.html";
+            return Promise.reject(new Error("Not logged in"));
+          }
+          return data.user;
+        });
+    }
+
+    function loadModuleHeader() {
+      fetch("/api/modules", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(mods => {
+          const mod = mods.find(m => m.id == moduleId);
+          if (mod) {
+            document.getElementById("moduleHeader").innerText =
+              mod.code + " - " + mod.name + " (Edit Students)";
+          }
+        });
+    }
+
+    function loadStudents() {
+      fetch("/api/modules/" + moduleId + "/students", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(rows => {
+          const wrap = document.getElementById("studentsWrap");
+          if (!rows || rows.length === 0) {
+            wrap.textContent = "No students found.";
+            return;
+          }
+          const table = document.createElement("table");
+          table.innerHTML = `
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Student Number</th>
+                <th>NFC UID</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          `;
+          const tbody = table.querySelector("tbody");
+          rows.forEach(s => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${s.id}</td>
+              <td>${s.name}</td>
+              <td>${s.student_number}</td>
+              <td>${s.nfc_uid || ""}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          wrap.innerHTML = "";
+          wrap.appendChild(table);
+        });
+    }
+
+    function updateNfc() {
+      const id = document.getElementById("studentId").value.trim();
+      const nfc_uid = document.getElementById("nfcUid").value.trim();
+      if (!id || !nfc_uid) return setStatus("Provide both Student ID and NFC UID.");
+
+      fetch("/api/students/" + id + "/nfc", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nfc_uid, module_id: Number(moduleId) })
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || "Update failed");
+        setStatus("Updated NFC UID for student #" + id);
+        loadStudents();
+      })
+      .catch(err => setStatus(err.message));
+    }
+
+    ensureLogin()
+      .then(() => loadModuleHeader())
+      .then(() => loadStudents())
+      .catch(() => {});
+  </script>
+</body>
+</html>

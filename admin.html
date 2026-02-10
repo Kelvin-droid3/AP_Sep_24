@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin - MTU Attendance</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+    :root {
+      --danger: #ef4444;
+      --ok: #22c55e;
+    }
+
+    body {
+      font-family: "Segoe UI", Arial;
+      padding: 0;
+    }
+
+    h1, h2 {
+      margin: 0 0 12px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px var(--shadow);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      box-sizing: border-box;
+    }
+
+    button {
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+
+    .danger {
+      background: var(--danger);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .err {
+      color: var(--danger);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    pre {
+      background: #0b1220;
+      padding: 10px;
+      border-radius: 8px;
+      overflow: auto;
+      max-height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span>Admin Console</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <h1>Admin Console</h1>
+    <p class="small">Admin-only management for lecturers, modules, students, and sessions.</p>
+
+  <div id="loginCard" class="card" style="max-width: 420px;">
+    <h2>Login</h2>
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="admin@mtu.ie" />
+    <label>Password</label>
+    <input id="loginPassword" type="password" placeholder="password" />
+    <button onclick="login()">Login</button>
+    <div id="loginStatus" class="status"></div>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <div class="grid" style="margin-top: 20px;">
+      <div class="card">
+        <h2>Lecturers</h2>
+        <button onclick="loadLecturers()">Load Lecturers</button>
+        <pre id="lecturersList">[]</pre>
+
+        <h3>Create Lecturer</h3>
+        <label>Name</label>
+        <input id="lecName" />
+        <label>Email</label>
+        <input id="lecEmail" />
+        <label>Password</label>
+        <input id="lecPassword" type="password" />
+        <label>Role</label>
+        <select id="lecRole">
+          <option value="lecturer">lecturer</option>
+          <option value="admin">admin</option>
+        </select>
+        <button onclick="createLecturer()">Create</button>
+
+        <h3>Update Lecturer</h3>
+        <label>ID</label>
+        <input id="lecIdUpdate" type="number" />
+        <label>Name</label>
+        <input id="lecNameUpdate" />
+        <label>Email</label>
+        <input id="lecEmailUpdate" />
+        <label>New Password (optional)</label>
+        <input id="lecPasswordUpdate" type="password" />
+        <label>Role</label>
+        <select id="lecRoleUpdate">
+          <option value="lecturer">lecturer</option>
+          <option value="admin">admin</option>
+        </select>
+        <button onclick="updateLecturer()">Update</button>
+
+        <h3>Delete Lecturer</h3>
+        <label>ID</label>
+        <input id="lecIdDelete" type="number" />
+        <button class="danger" onclick="deleteLecturer()">Delete</button>
+      </div>
+
+      <div class="card">
+        <h2>Modules</h2>
+        <button onclick="loadModules()">Load Modules</button>
+        <pre id="modulesList">[]</pre>
+
+        <h3>Create Module</h3>
+        <label>Code</label>
+        <input id="modCode" />
+        <label>Name</label>
+        <input id="modName" />
+        <button onclick="createModule()">Create</button>
+
+        <h3>Update Module</h3>
+        <label>ID</label>
+        <input id="modIdUpdate" type="number" />
+        <label>Code</label>
+        <input id="modCodeUpdate" />
+        <label>Name</label>
+        <input id="modNameUpdate" />
+        <button onclick="updateModule()">Update</button>
+
+        <h3>Delete Module</h3>
+        <label>ID</label>
+        <input id="modIdDelete" type="number" />
+        <button class="danger" onclick="deleteModule()">Delete</button>
+      </div>
+
+      <div class="card">
+        <h2>Students</h2>
+        <button onclick="loadStudents()">Load Students</button>
+        <pre id="studentsList">[]</pre>
+
+        <h3>Create Student</h3>
+        <label>Name</label>
+        <input id="stuName" />
+        <label>Student Number</label>
+        <input id="stuNumber" />
+        <label>NFC UID (optional)</label>
+        <input id="stuNfc" />
+        <button onclick="createStudent()">Create</button>
+
+        <h3>Update Student</h3>
+        <label>ID</label>
+        <input id="stuIdUpdate" type="number" />
+        <label>Name</label>
+        <input id="stuNameUpdate" />
+        <label>Student Number</label>
+        <input id="stuNumberUpdate" />
+        <label>NFC UID (optional)</label>
+        <input id="stuNfcUpdate" />
+        <button onclick="updateStudent()">Update</button>
+
+        <h3>Delete Student</h3>
+        <label>ID</label>
+        <input id="stuIdDelete" type="number" />
+        <button class="danger" onclick="deleteStudent()">Delete</button>
+      </div>
+
+      <div class="card">
+        <h2>Assign Modules</h2>
+        <label>Lecturer ID</label>
+        <input id="assignLecturerId" type="number" />
+        <label>Module ID</label>
+        <input id="assignModuleId" type="number" />
+        <button onclick="assignModule()">Assign</button>
+
+        <h3>Unassign Module</h3>
+        <label>Lecturer ID</label>
+        <input id="unassignLecturerId" type="number" />
+        <label>Module ID</label>
+        <input id="unassignModuleId" type="number" />
+        <button class="danger" onclick="unassignModule()">Unassign</button>
+      </div>
+
+      <div class="card">
+        <h2>Assign Students</h2>
+        <label>Module ID</label>
+        <input id="assignStudentModuleId" type="number" />
+        <label>Student ID</label>
+        <input id="assignStudentId" type="number" />
+        <button onclick="assignStudent()">Assign</button>
+
+        <h3>Unassign Student</h3>
+        <label>Module ID</label>
+        <input id="unassignStudentModuleId" type="number" />
+        <label>Student ID</label>
+        <input id="unassignStudentId" type="number" />
+        <button class="danger" onclick="unassignStudent()">Unassign</button>
+
+        <h3>Module Students</h3>
+        <label>Module ID</label>
+        <input id="listModuleStudentsId" type="number" />
+        <button onclick="listModuleStudents()">Load Students</button>
+        <pre id="moduleStudentsList">[]</pre>
+      </div>
+
+      <div class="card">
+        <h2>Session Controls</h2>
+        <label>End Session by ID</label>
+        <input id="endSessionId" type="number" />
+        <button class="danger" onclick="endSessionById()">Force End</button>
+
+        <label>End Active Session by Module ID</label>
+        <input id="endModuleId" type="number" />
+        <button class="danger" onclick="endActiveSession()">End Active</button>
+      </div>
+
+      <div class="card">
+        <h2>Sessions</h2>
+        <button onclick="loadSessions()">Load Sessions</button>
+        <pre id="sessionsList">[]</pre>
+      </div>
+
+      <div class="card">
+        <h2>Attendance Export</h2>
+        <label>Session ID (optional)</label>
+        <input id="exportSessionId" type="number" />
+        <label>Module ID (optional)</label>
+        <input id="exportModuleId" type="number" />
+        <button onclick="exportAttendance()">Download CSV</button>
+        <div id="exportStatus" class="status"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script>
+    function setStatus(id, message, ok = true) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = message;
+      el.className = ok ? "status ok" : "status err";
+    }
+
+    async function request(path, options = {}) {
+      const res = await fetch(path, {
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        ...options
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Request failed");
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return res.json();
+      }
+      return res.text();
+    }
+
+    async function login() {
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
+      const status = document.getElementById("loginStatus");
+
+      try {
+        const data = await request("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password })
+        });
+        status.textContent = "Logged in as " + data.email;
+        status.className = "status ok";
+        document.getElementById("loginCard").classList.add("hidden");
+        document.getElementById("adminPanel").classList.remove("hidden");
+      } catch (err) {
+        status.textContent = "Login failed: " + err.message;
+        status.className = "status err";
+      }
+    }
+
+    async function loadLecturers() {
+      const data = await request("/api/admin/lecturers");
+      document.getElementById("lecturersList").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function createLecturer() {
+      const payload = {
+        name: value("lecName"),
+        email: value("lecEmail"),
+        password: value("lecPassword"),
+        role: value("lecRole")
+      };
+      try {
+        await request("/api/admin/lecturers", { method: "POST", body: JSON.stringify(payload) });
+        await loadLecturers();
+        setStatus("loginStatus", "Lecturer created", true);
+      } catch (err) {
+        setStatus("loginStatus", "Create lecturer failed: " + err.message, false);
+      }
+    }
+
+    async function updateLecturer() {
+      const id = value("lecIdUpdate");
+      const payload = {
+        name: value("lecNameUpdate"),
+        email: value("lecEmailUpdate"),
+        password: value("lecPasswordUpdate"),
+        role: value("lecRoleUpdate")
+      };
+      try {
+        await request("/api/admin/lecturers/" + id, { method: "PUT", body: JSON.stringify(payload) });
+        await loadLecturers();
+        setStatus("loginStatus", "Lecturer updated", true);
+      } catch (err) {
+        setStatus("loginStatus", "Update lecturer failed: " + err.message, false);
+      }
+    }
+
+    async function deleteLecturer() {
+      const id = value("lecIdDelete");
+      try {
+        await request("/api/admin/lecturers/" + id, { method: "DELETE" });
+        await loadLecturers();
+        setStatus("loginStatus", "Lecturer deleted", true);
+      } catch (err) {
+        setStatus("loginStatus", "Delete lecturer failed: " + err.message, false);
+      }
+    }
+
+    async function loadModules() {
+      const data = await request("/api/admin/modules");
+      document.getElementById("modulesList").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function createModule() {
+      const payload = { code: value("modCode"), name: value("modName") };
+      try {
+        await request("/api/admin/modules", { method: "POST", body: JSON.stringify(payload) });
+        await loadModules();
+        setStatus("loginStatus", "Module created", true);
+      } catch (err) {
+        setStatus("loginStatus", "Create module failed: " + err.message, false);
+      }
+    }
+
+    async function updateModule() {
+      const id = value("modIdUpdate");
+      const payload = { code: value("modCodeUpdate"), name: value("modNameUpdate") };
+      try {
+        await request("/api/admin/modules/" + id, { method: "PUT", body: JSON.stringify(payload) });
+        await loadModules();
+        setStatus("loginStatus", "Module updated", true);
+      } catch (err) {
+        setStatus("loginStatus", "Update module failed: " + err.message, false);
+      }
+    }
+
+    async function deleteModule() {
+      const id = value("modIdDelete");
+      try {
+        await request("/api/admin/modules/" + id, { method: "DELETE" });
+        await loadModules();
+        setStatus("loginStatus", "Module deleted", true);
+      } catch (err) {
+        setStatus("loginStatus", "Delete module failed: " + err.message, false);
+      }
+    }
+
+    async function loadStudents() {
+      const data = await request("/api/admin/students");
+      document.getElementById("studentsList").textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function createStudent() {
+      const payload = {
+        name: value("stuName"),
+        student_number: value("stuNumber"),
+        nfc_uid: value("stuNfc")
+      };
+      try {
+        await request("/api/admin/students", { method: "POST", body: JSON.stringify(payload) });
+        await loadStudents();
+        setStatus("loginStatus", "Student created", true);
+      } catch (err) {
+        setStatus("loginStatus", "Create student failed: " + err.message, false);
+      }
+    }
+
+    async function updateStudent() {
+      const id = value("stuIdUpdate");
+      const payload = {
+        name: value("stuNameUpdate"),
+        student_number: value("stuNumberUpdate"),
+        nfc_uid: value("stuNfcUpdate")
+      };
+      try {
+        await request("/api/admin/students/" + id, { method: "PUT", body: JSON.stringify(payload) });
+        await loadStudents();
+        setStatus("loginStatus", "Student updated", true);
+      } catch (err) {
+        setStatus("loginStatus", "Update student failed: " + err.message, false);
+      }
+    }
+
+    async function deleteStudent() {
+      const id = value("stuIdDelete");
+      try {
+        await request("/api/admin/students/" + id, { method: "DELETE" });
+        await loadStudents();
+        setStatus("loginStatus", "Student deleted", true);
+      } catch (err) {
+        setStatus("loginStatus", "Delete student failed: " + err.message, false);
+      }
+    }
+
+    async function assignModule() {
+      const lecturerId = value("assignLecturerId");
+      const payload = { module_id: Number(value("assignModuleId")) };
+      try {
+        await request("/api/admin/lecturers/" + lecturerId + "/modules", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        setStatus("loginStatus", "Module assigned", true);
+      } catch (err) {
+        setStatus("loginStatus", "Assign module failed: " + err.message, false);
+      }
+    }
+
+    async function unassignModule() {
+      const lecturerId = value("unassignLecturerId");
+      const moduleId = value("unassignModuleId");
+      try {
+        await request("/api/admin/lecturers/" + lecturerId + "/modules/" + moduleId, {
+          method: "DELETE"
+        });
+        setStatus("loginStatus", "Module unassigned", true);
+      } catch (err) {
+        setStatus("loginStatus", "Unassign module failed: " + err.message, false);
+      }
+    }
+
+    async function endSessionById() {
+      const id = value("endSessionId");
+      try {
+        await request("/api/admin/sessions/" + id + "/end", { method: "POST" });
+        setStatus("loginStatus", "Session ended", true);
+      } catch (err) {
+        setStatus("loginStatus", "End session failed: " + err.message, false);
+      }
+    }
+
+    async function endActiveSession() {
+      const moduleId = value("endModuleId");
+      try {
+        await request("/api/admin/sessions/end-active", {
+          method: "POST",
+          body: JSON.stringify({ module_id: Number(moduleId) })
+        });
+        setStatus("loginStatus", "Active session ended", true);
+      } catch (err) {
+        setStatus("loginStatus", "End active session failed: " + err.message, false);
+      }
+    }
+
+    async function assignStudent() {
+      const moduleId = value("assignStudentModuleId");
+      const studentId = value("assignStudentId");
+      if (!moduleId || !studentId) {
+        return setStatus("loginStatus", "Provide module_id and student_id", false);
+      }
+      try {
+        await request("/api/admin/modules/" + moduleId + "/students", {
+          method: "POST",
+          body: JSON.stringify({ student_id: Number(studentId) })
+        });
+        setStatus("loginStatus", "Student assigned to module", true);
+      } catch (err) {
+        setStatus("loginStatus", "Assign student failed: " + err.message, false);
+      }
+    }
+
+    async function unassignStudent() {
+      const moduleId = value("unassignStudentModuleId");
+      const studentId = value("unassignStudentId");
+      if (!moduleId || !studentId) {
+        return setStatus("loginStatus", "Provide module_id and student_id", false);
+      }
+      try {
+        await request("/api/admin/modules/" + moduleId + "/students/" + studentId, {
+          method: "DELETE"
+        });
+        setStatus("loginStatus", "Student unassigned from module", true);
+      } catch (err) {
+        setStatus("loginStatus", "Unassign student failed: " + err.message, false);
+      }
+    }
+
+    async function listModuleStudents() {
+      const moduleId = value("listModuleStudentsId");
+      if (!moduleId) {
+        return setStatus("loginStatus", "Provide module_id to load students", false);
+      }
+      try {
+        const data = await request("/api/admin/modules/" + moduleId + "/students");
+        document.getElementById("moduleStudentsList").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        setStatus("loginStatus", "Load module students failed: " + err.message, false);
+      }
+    }
+
+    async function loadSessions() {
+      try {
+        const data = await request("/api/admin/sessions");
+        document.getElementById("sessionsList").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        setStatus("loginStatus", "Load sessions failed: " + err.message, false);
+      }
+    }
+
+    function value(id) {
+      return document.getElementById(id).value.trim();
+    }
+
+    async function exportAttendance() {
+      const sessionId = value("exportSessionId");
+      const moduleId = value("exportModuleId");
+      const params = new URLSearchParams();
+      if (sessionId) params.set("session_id", sessionId);
+      if (moduleId) params.set("module_id", moduleId);
+      params.set("format", "csv");
+
+      try {
+        const res = await fetch("/api/admin/attendance/export?" + params.toString(), {
+          credentials: "same-origin"
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Export failed");
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "attendance.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus("exportStatus", "Export complete", true);
+      } catch (err) {
+        setStatus("exportStatus", "Export failed: " + err.message, false);
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const data = await request("/api/auth/me");
+        if (data.user && data.user.role === "admin") {
+          document.getElementById("loginCard").classList.add("hidden");
+          document.getElementById("adminPanel").classList.remove("hidden");
+        }
+      } catch (err) {
+        return;
+      }
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>

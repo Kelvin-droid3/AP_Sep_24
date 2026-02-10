@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Module</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+    .wrapper{padding:40px}
+    button{padding:12px 16px;margin:8px;font-size:16px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer}
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="left">
+    <button class="nav-btn" data-nav="back">Back</button>
+    <button class="nav-btn" data-nav="home">Home</button>
+  </div>
+  <div class="brand">
+    <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+    <span>Module Options</span>
+  </div>
+  <div class="right">
+    <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+  </div>
+</header>
+
+<div class="wrapper">
+  <h2>Module Options</h2>
+  <button onclick="go('live.html')">Live Attendance</button>
+  <button onclick="go('reports.html')">Generate Reports</button>
+  <button onclick="go('edit.html')">Edit Students</button>
+</div>
+
+<script>
+function go(p){ window.location = p; }
+</script>
+
+</body>
+</html>

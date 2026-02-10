@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Attendance</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .panel {
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    input, button, select {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.danger {
+      background: #ef4444;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #111827;
+    }
+
+    .list {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .list-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span id="moduleHeader">Live Attendance</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="panel">
+      <h3>Session Control</h3>
+      <div class="row">
+        <button class="primary" onclick="startSession()">Start Session</button>
+        <button class="danger" onclick="endSession()">End Session</button>
+        <button onclick="refreshSession()">Refresh Status</button>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:13px;">
+          <input id="autoListenToggle" type="checkbox" onchange="toggleAutoListen()" />
+          Start Session + Auto Listen
+        </label>
+      </div>
+      <div id="sessionStatus" class="status">No session loaded.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Simulate NFC Tap</h3>
+      <div class="row">
+        <input id="nfcInput" placeholder="NFC UID (e.g. 04A1B2C3)" />
+        <button class="primary" onclick="tap()">Submit Tap</button>
+        <button onclick="clearTap()">Clear</button>
+      </div>
+      <div id="tapStatus" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Live Attendance</h3>
+      <button onclick="loadAttendance()">Refresh Now</button>
+      <div id="attendanceList" class="list">No data yet.</div>
+    </div>
+  </div>
+
+  <script>
+    const moduleId = localStorage.getItem("module");
+    let activeSessionId = null;
+    let refreshTimer = null;
+
+    function setStatus(id, msg) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = msg;
+    }
+
+    function ensureLogin() {
+      return fetch("/api/auth/me", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.user) {
+            window.location = "lecturer-login.html";
+            return Promise.reject(new Error("Not logged in"));
+          }
+          return data.user;
+        });
+    }
+
+    function loadModuleHeader() {
+      fetch("/api/modules", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(mods => {
+          const mod = mods.find(m => m.id == moduleId);
+          if (mod) {
+            document.getElementById("moduleHeader").innerText =
+              mod.code + " - " + mod.name + " (Live)";
+          }
+        });
+    }
+
+    function refreshSession() {
+      return fetch("/api/sessions/active?module_id=" + moduleId, {
+        credentials: "same-origin"
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.id) {
+          activeSessionId = data.id;
+          setStatus("sessionStatus", "Active session: #" + data.id + " (started " + data.start_time + ")");
+        } else {
+          activeSessionId = null;
+          setStatus("sessionStatus", "No active session.");
+        }
+      });
+    }
+
+    function startSession() {
+      fetch("/api/sessions", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module_id: Number(moduleId) })
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || "Failed to start session");
+        activeSessionId = data.id;
+        setStatus("sessionStatus", "Active session: #" + data.id);
+        loadAttendance();
+      })
+      .catch(err => setStatus("sessionStatus", err.message));
+    }
+
+    function endSession() {
+      if (!activeSessionId) {
+        return setStatus("sessionStatus", "No active session to end.");
+      }
+      fetch("/api/sessions/" + activeSessionId + "/end", {
+        method: "POST",
+        credentials: "same-origin"
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || "Failed to end session");
+        activeSessionId = null;
+        setStatus("sessionStatus", "Session ended.");
+      })
+      .catch(err => setStatus("sessionStatus", err.message));
+    }
+
+    function toggleAutoListen() {
+      const enabled = document.getElementById("autoListenToggle").checked;
+      if (enabled) {
+        startSession();
+        startAutoRefresh();
+        focusNfcInput();
+      } else {
+        stopAutoRefresh();
+      }
+    }
+
+    function tap() {
+      const nfc_uid = document.getElementById("nfcInput").value.trim();
+      if (!nfc_uid) return setStatus("tapStatus", "Enter an NFC UID.");
+
+      fetch("/api/tap", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nfc_uid, module_id: Number(moduleId) })
+      })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data.error || "Tap failed");
+        if (data.already_logged) {
+          setStatus("tapStatus", "Already logged: " + data.name);
+        } else {
+          setStatus("tapStatus", "Logged: " + data.name);
+        }
+        loadAttendance();
+      })
+      .catch(err => setStatus("tapStatus", err.message));
+    }
+
+    function clearTap() {
+      document.getElementById("nfcInput").value = "";
+      setStatus("tapStatus", "");
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      refreshTimer = setInterval(() => {
+        refreshSession().then(loadAttendance).catch(() => {});
+      }, 4000);
+    }
+
+    function stopAutoRefresh() {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    }
+
+    function focusNfcInput() {
+      const input = document.getElementById("nfcInput");
+      if (input) input.focus();
+    }
+
+    function loadAttendance() {
+      const list = document.getElementById("attendanceList");
+      const url = activeSessionId
+        ? "/api/attendance?session_id=" + activeSessionId
+        : "/api/attendance?module_id=" + moduleId;
+
+      fetch(url, { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(rows => {
+          if (!rows || rows.length === 0) {
+            list.textContent = "No attendance yet.";
+            return;
+          }
+          list.innerHTML = "";
+          rows.forEach(r => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = "<span>" + r.name + " (" + r.student_number + ")</span><span>" + r.timestamp + "</span>";
+            list.appendChild(div);
+          });
+        });
+    }
+
+    ensureLogin()
+      .then(() => loadModuleHeader())
+      .then(() => refreshSession())
+      .then(() => loadAttendance())
+      .then(() => startAutoRefresh())
+      .catch(() => {});
+
+    document.getElementById("nfcInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        tap();
+      }
+    });
+  </script>
+</body>
+</html>

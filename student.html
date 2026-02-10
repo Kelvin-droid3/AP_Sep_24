@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Timetable</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+
+    .card {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button.primary {
+      background: var(--accent-2);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .grid {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .grid th, .grid td {
+      border: 1px solid #e5e7eb;
+      padding: 6px;
+      text-align: center;
+      vertical-align: top;
+      min-width: 90px;
+    }
+
+    .grid th {
+      background: var(--panel);
+      font-weight: 600;
+    }
+
+    .pill {
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(37, 99, 235, 0.4);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 6px;
+      display: inline-block;
+      font-size: 12px;
+      margin: 2px 0;
+    }
+
+    .status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="left">
+    <button class="nav-btn" data-nav="back">Back</button>
+    <button class="nav-btn" data-nav="home">Home</button>
+  </div>
+  <div class="brand">
+    <img class="logo" src="public/mtu_logo.jpg" alt="MTU Logo">
+    <span id="headerTitle">Student Timetable</span>
+  </div>
+  <div class="right">
+    <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="loginCard" class="card">
+    <h3>Student Login</h3>
+    <input id="studentNumber" placeholder="Student Number (e.g. MTU001)" />
+    <input id="studentPassword" type="password" placeholder="Password" />
+    <button class="primary" onclick="login()">Login</button>
+    <div id="loginStatus" class="status"></div>
+  </div>
+
+  <div id="timetableCard" class="card" style="display:none;">
+    <h3>My Timetable</h3>
+    <div id="timetableGrid">Loading...</div>
+  </div>
+  
+  <div id="modulesCard" class="card" style="display:none;">
+    <h3>My Modules</h3>
+    <div id="modulesList">Loading...</div>
+  </div>
+
+  <div id="attendanceCard" class="card" style="display:none;">
+    <h3>My Attendance</h3>
+    <div id="attendanceList">Loading...</div>
+  </div>
+
+  <div id="accountCard" class="card" style="display:none;">
+    <h3>Account</h3>
+    <input id="currentPassword" type="password" placeholder="Current Password" />
+    <input id="newPassword" type="password" placeholder="New Password" />
+    <button class="primary" onclick="changePassword()">Change Password</button>
+    <button class="primary" onclick="logout()">Logout</button>
+    <div id="accountStatus" class="status"></div>
+  </div>
+</div>
+
+<script>
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+
+  function goHome() {
+    window.location.href = "index.html";
+  }
+
+  function goBack() {
+    history.back();
+  }
+
+  function setStatus(msg) {
+    document.getElementById("loginStatus").textContent = msg;
+  }
+
+  async function login() {
+    const student_number = document.getElementById("studentNumber").value.trim();
+    const password = document.getElementById("studentPassword").value.trim();
+    if (!student_number || !password) return setStatus("Enter student number and password.");
+
+    try {
+      const res = await fetch("/api/student/auth/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_number, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Login failed");
+      document.getElementById("loginCard").style.display = "none";
+      document.getElementById("timetableCard").style.display = "block";
+      document.getElementById("modulesCard").style.display = "block";
+      document.getElementById("attendanceCard").style.display = "block";
+      document.getElementById("accountCard").style.display = "block";
+      document.getElementById("headerTitle").textContent = "Welcome, " + data.name;
+      loadTimetable();
+      loadModules();
+      loadAttendance();
+    } catch (err) {
+      setStatus(err.message);
+    }
+  }
+
+  async function loadModules() {
+    const res = await fetch("/api/student/modules", { credentials: "same-origin" });
+    const data = await res.json().catch(() => []);
+    const list = document.getElementById("modulesList");
+    if (!data.length) {
+      list.textContent = "No modules assigned.";
+      return;
+    }
+    list.innerHTML = "";
+    data.forEach(m => {
+      const div = document.createElement("div");
+      div.style.cursor = "pointer";
+      div.style.padding = "6px 0";
+      div.textContent = m.code + " - " + m.name;
+      div.addEventListener("click", () => {
+        localStorage.setItem("student_module_id", m.id);
+        window.location.href = "module-details.html?id=" + m.id;
+      });
+      list.appendChild(div);
+    });
+  }
+
+  function timeToIndex(t) {
+    return timeSlots.indexOf(t);
+  }
+
+  function hourDiff(start, end) {
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const s = sh + sm / 60;
+    const e = eh + em / 60;
+    return Math.max(1, Math.round(e - s));
+  }
+
+  async function loadTimetable() {
+    const res = await fetch("/api/student/timetable", { credentials: "same-origin" });
+    const data = await res.json().catch(() => []);
+    const grid = document.getElementById("timetableGrid");
+    if (!data.length) {
+      grid.textContent = "No timetable data.";
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "grid";
+    const thead = document.createElement("thead");
+    thead.innerHTML = "<tr><th>Day</th>" + timeSlots.map(t => "<th>" + t + "</th>").join("") + "</tr>";
+    table.appendChild(thead);
+
+    const byDay = {};
+    data.forEach(item => {
+      if (!byDay[item.day]) byDay[item.day] = [];
+      byDay[item.day].push(item);
+    });
+
+    const tbody = document.createElement("tbody");
+    days.forEach(day => {
+      const row = document.createElement("tr");
+      row.innerHTML = "<th>" + day + "</th>";
+      const slots = timeSlots.slice();
+      for (let i = 0; i < slots.length; i += 1) {
+        const slot = slots[i];
+        const cell = document.createElement("td");
+        const entries = (byDay[day] || []).filter(e => e.start_time === slot);
+        if (entries.length) {
+          const e = entries[0];
+          const span = Math.min(slots.length - i, hourDiff(e.start_time, e.end_time));
+          cell.colSpan = span;
+          const pill = document.createElement("div");
+          pill.className = "pill";
+          pill.textContent = e.code + " " + e.start_time + "-" + e.end_time;
+          cell.appendChild(pill);
+          row.appendChild(cell);
+          i += span - 1;
+        } else {
+          cell.textContent = "";
+          row.appendChild(cell);
+        }
+      }
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    grid.innerHTML = "";
+    grid.appendChild(table);
+  }
+
+  async function checkLogin() {
+    const res = await fetch("/api/student/auth/me", { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (data.student) {
+      document.getElementById("loginCard").style.display = "none";
+      document.getElementById("timetableCard").style.display = "block";
+      document.getElementById("modulesCard").style.display = "block";
+      document.getElementById("attendanceCard").style.display = "block";
+      document.getElementById("accountCard").style.display = "block";
+      document.getElementById("headerTitle").textContent = "Welcome, " + data.student.name;
+      loadTimetable();
+      loadModules();
+      loadAttendance();
+    }
+  }
+
+  async function loadAttendance() {
+    const res = await fetch("/api/student/attendance", { credentials: "same-origin" });
+    const rows = await res.json().catch(() => []);
+    const list = document.getElementById("attendanceList");
+    if (!rows.length) {
+      list.textContent = "No attendance records yet.";
+      return;
+    }
+    list.innerHTML = "";
+    rows.forEach(r => {
+      const div = document.createElement("div");
+      div.textContent = r.code + " - " + r.module_name + " (" + r.timestamp + ")";
+      list.appendChild(div);
+    });
+  }
+
+  async function changePassword() {
+    const current_password = document.getElementById("currentPassword").value.trim();
+    const new_password = document.getElementById("newPassword").value.trim();
+    const status = document.getElementById("accountStatus");
+    if (!current_password || !new_password) {
+      status.textContent = "Enter current and new password.";
+      return;
+    }
+    const res = await fetch("/api/student/auth/change-password", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password, new_password })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      status.textContent = data.error || "Password change failed";
+      return;
+    }
+    status.textContent = "Password updated.";
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+  }
+
+  async function logout() {
+    await fetch("/api/student/auth/logout", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+    window.location.reload();
+  }
+
+  checkLogin();
+</script>
+
+</body>
+</html>

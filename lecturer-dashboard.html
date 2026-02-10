@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Modules</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:20px}
+    .card{padding:20px;border-radius:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="left">
+    <button class="nav-btn" data-nav="back">Back</button>
+    <button class="nav-btn" data-nav="home">Home</button>
+  </div>
+  <div class="brand">
+    <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+    <span>My Modules</span>
+  </div>
+  <div class="right">
+    <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+  </div>
+</header>
+<div class="grid" id="modules"></div>
+
+<script>
+fetch("/api/auth/me", { credentials: "same-origin" })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.user) {
+      window.location = "lecturer-login.html";
+      return Promise.reject(new Error("Not logged in"));
+    }
+    return fetch("/api/lecturer/modules", { credentials: "same-origin" });
+  })
+  .then(r => r.json())
+  .then(mods => {
+    mods.forEach(m => {
+      modules.innerHTML += `
+        <div class="card" onclick="openModule(${m.id})">
+          <b>${m.code}</b><br>${m.name}
+        </div>
+      `;
+    });
+  })
+  .catch(err => {
+    if (err.message !== "Not logged in") {
+      alert("Failed to load modules");
+    }
+  });
+
+function openModule(id){
+  localStorage.setItem("module", id);
+  window.location = "/module.html";
+}
+</script>
+
+</body>
+</html>

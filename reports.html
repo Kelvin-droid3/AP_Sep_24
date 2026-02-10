@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Module Reports</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .panel {
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .list-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span id="moduleHeader">Reports</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="panel">
+      <h3>Attendance Report</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <input id="searchInput" placeholder="Search student name or number" style="flex:1; min-width:220px; padding:10px; border-radius:6px; border:1px solid #d1d5db;" />
+        <input id="startDate" type="date" style="padding:10px; border-radius:6px; border:1px solid #d1d5db;" />
+        <input id="endDate" type="date" style="padding:10px; border-radius:6px; border:1px solid #d1d5db;" />
+        <button onclick="applySearch()">Search</button>
+        <button onclick="clearSearch()">Clear</button>
+        <button onclick="downloadCsv()">Download CSV</button>
+      </div>
+      <div id="reportList">Loading...</div>
+    </div>
+
+    <div class="panel">
+      <h3>Session History</h3>
+      <button onclick="loadSessions()">Load Sessions</button>
+      <div id="sessionsList">No sessions loaded.</div>
+    </div>
+  </div>
+
+  <script>
+    const moduleId = localStorage.getItem("module");
+    let cachedRows = [];
+    let filteredRows = [];
+
+    function ensureLogin() {
+      return fetch("/api/auth/me", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.user) {
+            window.location = "lecturer-login.html";
+            return Promise.reject(new Error("Not logged in"));
+          }
+          return data.user;
+        });
+    }
+
+    function loadModuleHeader() {
+      fetch("/api/modules", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(mods => {
+          const mod = mods.find(m => m.id == moduleId);
+          if (mod) {
+            document.getElementById("moduleHeader").innerText =
+              mod.code + " - " + mod.name + " (Reports)";
+          }
+        });
+    }
+
+    function loadAttendance() {
+      const params = new URLSearchParams();
+      params.set("module_id", moduleId);
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      if (startDate) params.set("start_date", startDate);
+      if (endDate) params.set("end_date", endDate);
+
+      fetch("/api/attendance?" + params.toString(), { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(rows => {
+          cachedRows = rows || [];
+          filteredRows = cachedRows;
+          const list = document.getElementById("reportList");
+          if (!filteredRows.length) {
+            list.textContent = "No attendance records yet.";
+            return;
+          }
+          list.innerHTML = "";
+          filteredRows.forEach(r => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.innerHTML = "<span>" + r.name + " (" + r.student_number + ")</span><span>" + r.timestamp + "</span>";
+            list.appendChild(div);
+          });
+        });
+    }
+
+    function applySearch() {
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      if (startDate || endDate) {
+        loadAttendance().then(() => applySearch());
+        return;
+      }
+      if (!q) {
+        filteredRows = cachedRows;
+      } else {
+        filteredRows = cachedRows.filter(r => {
+          const name = String(r.name || "").toLowerCase();
+          const num = String(r.student_number || "").toLowerCase();
+          return name.includes(q) || num.includes(q);
+        });
+      }
+      renderList();
+    }
+
+    function clearSearch() {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("startDate").value = "";
+      document.getElementById("endDate").value = "";
+      filteredRows = cachedRows;
+      renderList();
+    }
+
+    function renderList() {
+      const list = document.getElementById("reportList");
+      if (!filteredRows.length) {
+        list.textContent = "No attendance records match your search.";
+        return;
+      }
+      list.innerHTML = "";
+      filteredRows.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "list-item";
+        div.innerHTML = "<span>" + r.name + " (" + r.student_number + ")</span><span>" + r.timestamp + "</span>";
+        list.appendChild(div);
+      });
+    }
+
+    function downloadCsv() {
+      if (!filteredRows.length) {
+        alert("No data to export yet.");
+        return;
+      }
+      const header = [
+        "name",
+        "student_number",
+        "module_code",
+        "module_name",
+        "session_id",
+        "timestamp"
+      ].join(",");
+
+      const lines = filteredRows.map(r => {
+        const safe = (v) => {
+          const t = String(v ?? "");
+          if (t.includes(",") || t.includes("\"") || t.includes("\n")) {
+            return "\"" + t.replace(/"/g, "\"\"") + "\"";
+          }
+          return t;
+        };
+        return [
+          safe(r.name),
+          safe(r.student_number),
+          safe(r.code),
+          safe(r.module_name),
+          safe(r.session_id),
+          safe(r.timestamp)
+        ].join(",");
+      });
+
+      const csv = [header, ...lines].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "attendance-module-" + moduleId + ".csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    ensureLogin()
+      .then(() => loadModuleHeader())
+      .then(() => loadAttendance())
+      .then(() => loadSessions())
+      .catch(() => {});
+
+    function loadSessions() {
+      const params = new URLSearchParams();
+      params.set("module_id", moduleId);
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      if (startDate) params.set("start_date", startDate);
+      if (endDate) params.set("end_date", endDate);
+
+      return fetch("/api/sessions/history?" + params.toString(), { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(rows => {
+          const list = document.getElementById("sessionsList");
+          if (!rows || rows.length === 0) {
+            list.textContent = "No sessions found for this period.";
+            return;
+          }
+          list.innerHTML = "";
+          rows.forEach(s => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            const endText = s.end_time ? s.end_time : "Active";
+            div.innerHTML =
+              "<span>Session #" + s.id + " (" + s.start_time + " → " + endText + ")</span>" +
+              "<span>Attendance: " + s.attendance_count + "</span>";
+            list.appendChild(div);
+          });
+        });
+    }
+  </script>
+</body>
+</html>

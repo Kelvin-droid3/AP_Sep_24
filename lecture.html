@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lecturer Module</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    #moduleHeader {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .container {
+      padding: 40px;
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      padding: 30px;
+      border-radius: 10px;
+      width: 250px;
+      text-align: center;
+      box-shadow: 0 4px 10px var(--shadow);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    .desc {
+      color: var(--muted);
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="left">
+    <button class="nav-btn" data-nav="back">Back</button>
+    <button class="nav-btn" data-nav="home">Home</button>
+  </div>
+  <div class="brand">
+    <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+    <span id="moduleHeader">Module</span>
+  </div>
+  <div class="right">
+    <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="card" onclick="go('live.html')">
+    <h2>Live Attendance</h2>
+    <p class="desc">View students tapping in live during class.</p>
+  </div>
+
+  <div class="card" onclick="go('reports.html')">
+    <h2>Generate Reports</h2>
+    <p class="desc">Download attendance reports for this module.</p>
+  </div>
+
+  <div class="card" onclick="go('edit.html')">
+    <h2>Edit Students</h2>
+    <p class="desc">Add, edit or remove students from this class.</p>
+  </div>
+
+</div>
+
+<script>
+const moduleId = localStorage.getItem("module");
+
+fetch("/api/auth/me", { credentials: "same-origin" })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.user) {
+      window.location = "lecturer-login.html";
+      return Promise.reject(new Error("Not logged in"));
+    }
+    return fetch("/api/modules", { credentials: "same-origin" });
+  })
+  .then(r => r.json())
+  .then(mods => {
+    const mod = mods.find(m => m.id == moduleId);
+    if (mod) {
+      document.getElementById("moduleHeader").innerText =
+        mod.code + " - " + mod.name;
+    }
+  })
+  .catch(err => {
+    if (err.message !== "Not logged in") {
+      alert("Failed to load module");
+    }
+  });
+
+function go(page) {
+  window.location.href = page;
+}
+</script>
+
+</body>
+</html>

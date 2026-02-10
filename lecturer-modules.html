@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Select Module</title>
+<link rel="stylesheet" href="theme.css">
+<script src="theme.js" defer></script>
+<style>
+
+.container {
+  padding: 30px;
+  max-width: 800px;
+  margin: auto;
+}
+
+.module {
+  padding: 20px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px var(--shadow);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.module:hover {
+  background: rgba(148, 163, 184, 0.2);
+  transform: scale(1.02);
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="left">
+    <button class="nav-btn" data-nav="back">Back</button>
+    <button class="nav-btn" data-nav="home">Home</button>
+  </div>
+  <div class="brand">
+    <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+    <span>Select Module</span>
+  </div>
+  <div class="right">
+    <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+  </div>
+</header>
+
+<div class="container" id="modules">
+</div>
+
+<script>
+function ensureLogin() {
+  return fetch("/api/auth/me", { credentials: "same-origin" })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.user) {
+        window.location = "lecturer-login.html";
+        return Promise.reject(new Error("Not logged in"));
+      }
+      return data.user;
+    });
+}
+
+ensureLogin()
+  .then(() => fetch("/api/lecturer/modules", { credentials: "same-origin" }))
+  .then(r => r.json())
+  .then(mods => {
+    const div = document.getElementById("modules");
+
+    if (!mods || mods.length === 0) {
+      div.innerHTML = "<p>No modules assigned</p>";
+      return;
+    }
+
+    mods.forEach(m => {
+      const d = document.createElement("div");
+      d.className = "module";
+      d.innerText = m.code + " - " + m.name;
+      d.onclick = () => {
+        localStorage.setItem("module", m.id);
+        window.location = "lecture.html";
+      };
+      div.appendChild(d);
+    });
+  })
+  .catch(err => {
+    if (err.message !== "Not logged in") {
+      alert("Failed to load modules");
+    }
+  });
+
+</script>
+
+
+</body>
+</html>

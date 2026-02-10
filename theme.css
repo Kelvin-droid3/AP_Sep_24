@@ -1,0 +1,95 @@
+:root {
+  --bg: #0f172a;
+  --panel: #0b1220;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-2: #16a34a;
+  --border: #1e293b;
+  --card: #0b1220;
+  --header: #111827;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+
+body.light {
+  --bg: #f1f5f9;
+  --panel: #ffffff;
+  --text: #0f172a;
+  --muted: #475569;
+  --accent: #2563eb;
+  --accent-2: #16a34a;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --header: #0f172a;
+  --shadow: rgba(15, 23, 42, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-header {
+  background: var(--header);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.app-header .left,
+.app-header .right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.brand .logo {
+  height: 32px;
+  width: auto;
+}
+
+.nav-btn,
+.theme-toggle {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 0 16px;
+}
+
+.card,
+.panel,
+.box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px var(--shadow);
+  border-radius: 10px;
+}
+
+.muted {
+  color: var(--muted);
+}

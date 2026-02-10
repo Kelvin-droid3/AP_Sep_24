@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Module Details</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+    .card {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .list-item {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    .chart {
+      width: 100%;
+      height: 220px;
+    }
+
+    .chart-wrap {
+      position: relative;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text);
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span id="moduleTitle">Module Details</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h3>Module Information</h3>
+      <div id="moduleInfo">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h3>Timetable Slots</h3>
+      <div id="moduleTimetable">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h3>My Attendance (This Module)</h3>
+      <div id="nextClass" class="muted" style="margin-bottom:8px;">Next class: calculating...</div>
+      <div class="chart-wrap">
+        <canvas id="attendanceChart" class="chart"></canvas>
+        <div id="chartTooltip" class="tooltip"></div>
+      </div>
+      <div id="moduleAttendance">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const moduleId = params.get("id") || localStorage.getItem("student_module_id");
+    let moduleCode = "";
+    let chartState = { labels: [], values: [], bars: [] };
+
+    function ensureLogin() {
+      return fetch("/api/student/auth/me", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.student) {
+            window.location.href = "student.html";
+            return Promise.reject(new Error("Not logged in"));
+          }
+          return data.student;
+        });
+    }
+
+    function loadModuleInfo() {
+      return fetch("/api/student/modules/" + moduleId + "/details", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          const info = document.getElementById("moduleInfo");
+          if (!data || !data.module) {
+            info.textContent = "Module not found.";
+            return;
+          }
+          moduleCode = data.module.code;
+          document.getElementById("moduleTitle").textContent = data.module.code + " - " + data.module.name;
+          const lecturerList = (data.lecturers || []).join(", ") || "TBA";
+          info.innerHTML = `
+            <div><strong>Code:</strong> ${data.module.code}</div>
+            <div><strong>Title:</strong> ${data.module.name}</div>
+            <div><strong>Lecturer(s):</strong> ${lecturerList}</div>
+          `;
+          if (data.timetable && data.timetable.length) {
+            updateNextClass(data.timetable);
+          }
+        });
+    }
+
+    function loadModuleTimetable() {
+      return fetch("/api/student/modules/" + moduleId + "/details", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(data => {
+          const list = document.getElementById("moduleTimetable");
+          const filtered = (data && data.timetable) ? data.timetable : [];
+          if (!filtered.length) {
+            list.textContent = "No timetable slots found.";
+            return;
+          }
+          list.innerHTML = "";
+          filtered.forEach(r => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.textContent = r.day + " " + r.start_time + "-" + r.end_time + " (" + r.room + ")";
+            list.appendChild(div);
+          });
+        });
+    }
+
+    function loadModuleAttendance() {
+      return fetch("/api/student/attendance", { credentials: "same-origin" })
+        .then(r => r.json())
+        .then(rows => {
+          const list = document.getElementById("moduleAttendance");
+          const filtered = rows.filter(r => r.code === moduleCode);
+          if (!filtered.length) {
+            list.textContent = "No attendance records for this module.";
+            renderChart([]);
+            return;
+          }
+          list.innerHTML = "";
+          filtered.forEach(r => {
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.textContent = r.code + " - " + r.module_name + " (" + r.timestamp + ")";
+            list.appendChild(div);
+          });
+          renderChart(filtered);
+        });
+    }
+
+    function updateNextClass(slots) {
+      const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      const now = new Date();
+      const nowDay = dayOrder[now.getDay() - 1] || "Monday";
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      let next = null;
+      slots.forEach(s => {
+        const dayIndex = dayOrder.indexOf(s.day);
+        const startParts = s.start_time.split(":").map(Number);
+        const startMinutes = startParts[0] * 60 + startParts[1];
+
+        let deltaDays = dayIndex - dayOrder.indexOf(nowDay);
+        if (deltaDays < 0) deltaDays += 7;
+        if (deltaDays === 0 && startMinutes <= nowMinutes) {
+          deltaDays = 7;
+        }
+        const score = deltaDays * 24 * 60 + startMinutes;
+        if (!next || score < next.score) {
+          next = { day: s.day, start: s.start_time, end: s.end_time, score };
+        }
+      });
+
+      const el = document.getElementById("nextClass");
+      if (!next) {
+        el.textContent = "Next class: not scheduled.";
+      } else {
+        el.textContent = "Next class: " + next.day + " " + next.start + "-" + next.end;
+      }
+    }
+
+    function renderChart(rows) {
+      const canvas = document.getElementById("attendanceChart");
+      const ctx = canvas.getContext("2d");
+      const tooltip = document.getElementById("chartTooltip");
+      const counts = {};
+      rows.forEach(r => {
+        const day = String(r.timestamp).split(" ")[0];
+        counts[day] = (counts[day] || 0) + 1;
+      });
+      const labels = Object.keys(counts).sort();
+      const values = labels.map(l => counts[l]);
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      chartState = { labels, values, bars: [] };
+
+      if (!labels.length) {
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillText("No attendance data for chart.", 10, 20);
+        tooltip.style.display = "none";
+        return;
+      }
+
+      const max = Math.max(...values);
+      const padding = 30;
+      const barWidth = (width - padding * 2) / values.length;
+      values.forEach((v, i) => {
+        const barHeight = Math.round((height - padding * 2) * (v / max));
+        const x = padding + i * barWidth;
+        const y = height - padding - barHeight;
+        chartState.bars.push({ x: x + 6, y, w: barWidth - 12, h: barHeight, label: labels[i], value: v });
+        ctx.fillStyle = "rgba(59,130,246,0.8)";
+        ctx.fillRect(x + 6, y, barWidth - 12, barHeight);
+      });
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "12px Arial";
+      labels.forEach((l, i) => {
+        const x = padding + i * barWidth;
+        ctx.fillText(l.slice(5), x + 4, height - 10);
+      });
+      tooltip.style.display = "none";
+    }
+
+    function bindChartHover() {
+      const canvas = document.getElementById("attendanceChart");
+      const tooltip = document.getElementById("chartTooltip");
+      canvas.addEventListener("mousemove", (e) => {
+        if (!chartState.bars.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const hit = chartState.bars.find(b => mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h);
+        if (hit) {
+          tooltip.style.display = "block";
+          tooltip.textContent = hit.label + ": " + hit.value;
+          tooltip.style.left = Math.min(mx + 10, rect.width - 80) + "px";
+          tooltip.style.top = Math.max(my - 28, 6) + "px";
+        } else {
+          tooltip.style.display = "none";
+        }
+      });
+      canvas.addEventListener("mouseleave", () => {
+        tooltip.style.display = "none";
+      });
+    }
+
+    ensureLogin()
+      .then(() => loadModuleInfo())
+      .then(() => loadModuleTimetable())
+      .then(() => loadModuleAttendance())
+      .then(() => bindChartHover())
+      .catch(() => {});
+  </script>
+</body>
+</html>

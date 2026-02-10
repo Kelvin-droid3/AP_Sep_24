@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MTU NFC Attendance</title>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js" defer></script>
+  <style>
+    .hero {
+      height: calc(100vh - 56px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .box {
+      padding: 40px;
+      border-radius: 12px;
+      width: 420px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: var(--muted);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .student {
+      background: var(--accent-2);
+      color: white;
+    }
+
+    .lecturer {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="left">
+      <button class="nav-btn" data-nav="back">Back</button>
+      <button class="nav-btn" data-nav="home">Home</button>
+    </div>
+    <div class="brand">
+      <img class="logo" src="assets/mtu-logo.png" alt="MTU Logo">
+      <span>MTU Attendance</span>
+    </div>
+    <div class="right">
+      <button id="themeToggle" class="theme-toggle">Toggle Theme</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div class="box">
+      <h1>MTU Attendance System</h1>
+      <p>Select your role</p>
+
+      <button class="btn student" onclick="goStudent()">I am a Student</button>
+      <button class="btn lecturer" onclick="goLecturer()">I am a Lecturer</button>
+      <button class="btn lecturer" onclick="goAdmin()">I am an Admin</button>
+    </div>
+  </div>
+
+  <script>
+  function goStudent() {
+    window.location.href = "student.html";
+  }
+
+  function goLecturer() {
+    window.location.href = "/lecturer-login.html";
+  }
+
+  function goAdmin() {
+    window.location.href = "/admin.html";
+  }
+  </script>
+</body>
+</html>
